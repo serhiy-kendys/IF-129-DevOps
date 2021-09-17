@@ -51,8 +51,9 @@ resource "google_compute_instance" "vm_db_mongo" {
         private_key = file(var.privatekeypath)
       }
       inline = [
-       "chmod a+x /tmp/startup.sh",
-       "sudo /tmp/startup.sh"
+        "chmod a+x /tmp/startup.sh",
+        "sudo /tmp/startup.sh",
+        "rm -f /tmp/startup.sh"
       ]
     }
 
@@ -100,7 +101,8 @@ resource "google_compute_instance" "vm_lb_nginx" {
     }
     inline = [
       "chmod a+x /tmp/startup.sh",
-      "sudo /tmp/startup.sh"
+      "sudo /tmp/startup.sh",
+      "rm -f /tmp/startup.sh"
     ]
   }
 
@@ -166,6 +168,58 @@ resource "google_compute_instance" "vm_be_js0" {
   }
 
   provisioner "file" {
+    source = "tmp/be_deploy_api.sh"
+    destination = "/tmp/deploy_api.sh"
+    connection {
+      host        = self.network_interface.0.access_config.0.nat_ip
+      type        = "ssh"
+      user        = var.user
+      timeout     = "600s"
+      private_key = file(var.privatekeypath)
+    }
+  }
+
+  provisioner "remote-exec" {
+    connection {
+      host = self.network_interface.0.access_config.0.nat_ip
+      type = "ssh"
+      user = var.user
+      timeout = "600s"
+      private_key = file(var.privatekeypath)
+    }
+    inline = [
+      "chmod a+x /tmp/deploy_api.sh",
+      "sudo mv /tmp/deploy_api.sh /srv/scripts/"
+    ]
+  }
+
+  provisioner "file" {
+    source = "tmp/be_deploy_ui.sh"
+    destination = "/tmp/deploy_ui.sh"
+    connection {
+      host        = self.network_interface.0.access_config.0.nat_ip
+      type        = "ssh"
+      user        = var.user
+      timeout     = "600s"
+      private_key = file(var.privatekeypath)
+    }
+  }
+
+  provisioner "remote-exec" {
+    connection {
+      host = self.network_interface.0.access_config.0.nat_ip
+      type = "ssh"
+      user = var.user
+      timeout = "600s"
+      private_key = file(var.privatekeypath)
+    }
+    inline = [
+      "chmod a+x /tmp/deploy_ui.sh",
+      "sudo mv /tmp/deploy_ui.sh /srv/scripts/"
+    ]
+  }
+
+  provisioner "file" {
     source = "tmp/be_api_env.sh"
     destination = "/tmp/env.sh"
     connection {
@@ -187,7 +241,8 @@ resource "google_compute_instance" "vm_be_js0" {
     }
     inline = [
       "chmod a+x /tmp/env.sh",
-      "sudo /tmp/env.sh"
+      "sudo /tmp/env.sh",
+      "rm -f /tmp/env.sh"
     ]
   }
 
@@ -213,7 +268,8 @@ resource "google_compute_instance" "vm_be_js0" {
     }
     inline = [
       "chmod a+x /tmp/startup.sh",
-      "sudo -E /tmp/startup.sh"
+      "sudo -E /tmp/startup.sh",
+      "rm -f /tmp/startup.sh"
     ]
   }
 
@@ -279,6 +335,58 @@ resource "google_compute_instance" "vm_be_js1" {
   }
 
   provisioner "file" {
+    source = "tmp/be_deploy_api.sh"
+    destination = "/tmp/deploy_api.sh"
+    connection {
+      host        = self.network_interface.0.access_config.0.nat_ip
+      type        = "ssh"
+      user        = var.user
+      timeout     = "600s"
+      private_key = file(var.privatekeypath)
+    }
+  }
+
+  provisioner "remote-exec" {
+    connection {
+      host = self.network_interface.0.access_config.0.nat_ip
+      type = "ssh"
+      user = var.user
+      timeout = "600s"
+      private_key = file(var.privatekeypath)
+    }
+    inline = [
+      "chmod a+x /tmp/deploy_api.sh",
+      "sudo mv /tmp/deploy_api.sh /srv/scripts/"
+    ]
+  }
+
+  provisioner "file" {
+    source = "tmp/be_deploy_ui.sh"
+    destination = "/tmp/deploy_ui.sh"
+    connection {
+      host        = self.network_interface.0.access_config.0.nat_ip
+      type        = "ssh"
+      user        = var.user
+      timeout     = "600s"
+      private_key = file(var.privatekeypath)
+    }
+  }
+
+  provisioner "remote-exec" {
+    connection {
+      host = self.network_interface.0.access_config.0.nat_ip
+      type = "ssh"
+      user = var.user
+      timeout = "600s"
+      private_key = file(var.privatekeypath)
+    }
+    inline = [
+      "chmod a+x /tmp/deploy_ui.sh",
+      "sudo mv /tmp/deploy_ui.sh /srv/scripts/"
+    ]
+  }
+
+  provisioner "file" {
     source = "tmp/be_api_env.sh"
     destination = "/tmp/env.sh"
     connection {
@@ -300,7 +408,8 @@ resource "google_compute_instance" "vm_be_js1" {
     }
     inline = [
       "chmod a+x /tmp/env.sh",
-      "sudo /tmp/env.sh"
+      "sudo /tmp/env.sh",
+      "rm -f /tmp/env.sh"
     ]
   }
 
@@ -326,7 +435,8 @@ resource "google_compute_instance" "vm_be_js1" {
     }
     inline = [
       "chmod a+x /tmp/startup.sh",
-      "sudo -E /tmp/startup.sh"
+      "sudo -E /tmp/startup.sh",
+      "rm -f /tmp/startup.sh"
     ]
   }
 
@@ -364,6 +474,7 @@ resource "random_password" "token" {
 
 resource "local_file" "be_api_env" {
   content = templatefile("be_api_env.sh.tpl", {
+    NODE_ENV = var.node_env,
     API_PORT = var.api_port,
     JWT = random_password.token.result,
     MONGODB_IP = google_compute_instance.vm_db_mongo.network_interface.0.network_ip
@@ -373,18 +484,32 @@ resource "local_file" "be_api_env" {
 
 resource "local_file" "be_api_startup" {
   content = templatefile("be_api.sh.tpl", {
-    NODE_ENV = var.node_env,
     REPO_API = var.repo_api,
     REPO_UI = var.repo_ui,
     INI_EMAIL = var.initial_email,
     INI_PASSWD = var.initial_password,
     INI_USER = var.initial_username,
     API_PORT = var.api_port,
-    JWT = random_password.token.result,
     MONGODB_IP = google_compute_instance.vm_db_mongo.network_interface.0.network_ip,
     NGINX_IP = google_compute_instance.vm_lb_nginx.network_interface.0.access_config.0.nat_ip
   })
   filename = "tmp/be_api.sh"
+}
+
+resource "local_file" "be_deploy_api" {
+  content = templatefile("be_deploy_api.sh.tpl", {
+    REPO_API = var.repo_api
+  })
+  filename = "tmp/be_deploy_api.sh"
+}
+
+resource "local_file" "be_deploy_ui" {
+  content = templatefile("be_deploy_ui.sh.tpl", {
+    REPO_UI = var.repo_ui,
+    API_PORT = var.api_port,
+    NGINX_IP = google_compute_instance.vm_lb_nginx.network_interface.0.access_config.0.nat_ip
+  })
+  filename = "tmp/be_deploy_ui.sh"
 }
 
 resource "local_file" "lb_nginx_conf" {
@@ -419,7 +544,6 @@ resource "local_file" "lb_nginx_conf" {
     inline = [
       "sudo chown root:root /tmp/nginx.conf",
       "sudo mv /tmp/nginx.conf /etc/nginx/",
-      "sudo rm /etc/nginx/sites-enabled/default",
       "sudo systemctl start nginx"
     ]
   }
